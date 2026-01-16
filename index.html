@@ -234,23 +234,145 @@
         let totalChildren = 70, emergencyPlaces = 40, childrenData = {}, currentSelection = [], 
             logEntries = [], drawCounter = 0;
 
-        function saveToStorage() {
-            localStorage.setItem('kita_notbetreuung_data', JSON.stringify({
-                childrenData, currentSelection, logEntries, totalChildren, emergencyPlaces, drawCounter, version: '3.0'
-            }));
-        }
+     /* =========================================================
+   🔐 PIN SCHUTZ
+========================================================= */
+const APP_PIN = "2749"; // <-- PIN hier ändern
 
-        function loadFromStorage() {
-            try {
-                const data = JSON.parse(localStorage.getItem('kita_notbetreuung_data') || '{}');
-                if (data.version?.startsWith('2.') || data.version === '3.0') {
-                    ({childrenData, currentSelection, logEntries, totalChildren, emergencyPlaces, drawCounter} = data);
-                    return true;
-                }
-            } catch(e) {}
-            return false;
-        }
+/* =========================================================
+   ☁️ GITHUB CLOUD KONFIGURATION (PLATZHALTER)
+========================================================= */
+const GITHUB_CONFIG = {
+    owner: "kitastpeter",                     // <-- GitHub Name
+    repo: "Notbetreuung",                // <-- Repo Name
+    file: "data.json",
+    branch: "main",
+    token: "github_pat"      // <-- PLATZHALTER
+};
 
+/* =========================================================
+   📦 GLOBALE DATEN
+========================================================= */
+let totalChildren = 70;
+let emergencyPlaces = 40;
+let childrenData = {};
+let currentSelection = [];
+let logEntries = [];
+let drawCounter = 0;
+
+/* =========================================================
+   🔐 APP ENTSPERREN
+========================================================= */
+function unlockApp() {
+    const input = document.getElementById("pinField").value;
+    if (input === APP_PIN) {
+        document.getElementById("appLock").style.display = "none";
+        init();
+    } else {
+        document.getElementById("pinError").style.display = "block";
+        document.getElementById("pinField").value = "";
+    }
+}
+
+/* =========================================================
+   ☁️ CLOUD LADEN
+========================================================= */
+async function loadFromCloud() {
+    try {
+        const url = `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${GITHUB_CONFIG.file}`;
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) throw new Error();
+
+        const data = await res.json();
+        ({
+            childrenData,
+            currentSelection,
+            logEntries,
+            drawCounter,
+            totalChildren,
+            emergencyPlaces
+        } = data);
+
+        return true;
+    } catch (e) {
+        console.warn("Cloud nicht erreichbar – nutze lokal");
+        return false;
+    }
+}
+
+/* =========================================================
+   ☁️ CLOUD SPEICHERN
+========================================================= */
+async function saveToCloud() {
+    if (GITHUB_CONFIG.token === "github_pat") return;
+
+    const content = {
+        childrenData,
+        currentSelection,
+        logEntries,
+        drawCounter,
+        totalChildren,
+        emergencyPlaces,
+        lastUpdate: new Date().toISOString()
+    };
+
+    const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.file}`;
+
+    const res = await fetch(apiUrl, {
+        headers: {
+            Authorization: `Bearer ${GITHUB_CONFIG.token}`,
+            Accept: "application/vnd.github+json"
+        }
+    });
+
+    const json = await res.json();
+
+    await fetch(apiUrl, {
+        method: "PUT",
+        headers: {
+            Authorization: `Bearer ${GITHUB_CONFIG.token}`,
+            Accept: "application/vnd.github+json"
+        },
+        body: JSON.stringify({
+            message: "Auto-Save Notbetreuung",
+            content: btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2)))),
+            sha: json.sha,
+            branch: GITHUB_CONFIG.branch
+        })
+    });
+}
+
+/* =========================================================
+   💾 LOKAL + CLOUD KOMBINIERT
+========================================================= */
+async function saveToStorage() {
+    localStorage.setItem("kita_backup", JSON.stringify({
+        childrenData,
+        currentSelection,
+        logEntries,
+        drawCounter,
+        totalChildren,
+        emergencyPlaces
+    }));
+    await saveToCloud();
+}
+
+async function loadFromStorage() {
+    if (await loadFromCloud()) return;
+
+    const local = localStorage.getItem("kita_backup");
+    if (local) {
+        ({
+            childrenData,
+            currentSelection,
+            logEntries,
+            drawCounter,
+            totalChildren,
+            emergencyPlaces
+        } = JSON.parse(local));
+    }
+}
+			
         function init() {
             loadFromStorage() || (ensureChildrenExist(), saveToStorage());
             updateChildSelect(); renderChildren(); renderLog(); loadSettings(); updateButtons();
@@ -460,7 +582,10 @@ function renderChildren() {
         document.getElementById('totalChildren').addEventListener('change', saveSettings);
         document.getElementById('emergencyPlaces').addEventListener('change', saveSettings);
 
-        window.addEventListener('load', init);
+        window.addEventListener("load", () => {
+    document.getElementById("pinField").focus();
+});
+
 		
 		function exportBackup() {
     const backup = {
@@ -534,3 +659,4 @@ function renderChildren() {
 	<input type="file" id="backupFileInput" accept=".txt" style="display:none">
 </body>
 </html>
+

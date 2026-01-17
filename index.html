@@ -397,18 +397,19 @@ function loadSettings() {
    🎲 ZIEHUNG
 ========================================================= */
 function startRandomSelection() {
+    ensureChildrenExist();
+
     drawCounter++;
     currentSelection = [];
 
-    const pool = Object.keys(childrenData)
-        .map(id => ({ id: +id, draws: childrenData[id].draws }))
-        .sort((a, b) => a.draws - b.draws || Math.random() - 0.5);
 
-    pool.slice(0, emergencyPlaces).forEach(k => {
-        currentSelection.push(k.id);
-        childrenData[k.id].draws++;
-        childrenData[k.id].lastDraw = new Date().toISOString();
-    });
+const pool = [];
+for (let i = 1; i <= totalChildren; i++) {
+    if (!childrenData[i]) {
+        childrenData[i] = { draws: 0, lastDraw: null };
+    }
+    pool.push({ id: i, draws: childrenData[i].draws });
+}
 
     logAction(`🎲 Ziehung #${drawCounter} (${currentSelection.length})`);
     renderChildren();
@@ -499,7 +500,11 @@ function checkFairness() {
         `Fairness: ${min}–${max}`;
 }
 
-window.onload = () => document.getElementById("pinField").focus();
+window.onload = () => {
+    const pin = document.getElementById("pinField");
+    if (pin) pin.focus();
+};
+
 
 console.log("SCRIPT ENDE");
 </script>
@@ -507,5 +512,6 @@ console.log("SCRIPT ENDE");
 	<input type="file" id="backupFileInput" accept=".txt" style="display:none">
 </body>
 </html>
+
 
 

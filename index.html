@@ -249,19 +249,7 @@
     </div>
 
     <script>
-
-function unlockApp() {
-    const pin = document.getElementById("pinField").value;
-    if (pin === APP_PIN) {
-        document.getElementById("appLock").style.display = "none";
-        init();
-    } else {
-        document.getElementById("pinError").style.display = "block";
-        document.getElementById("pinField").value = "";
-    }
-}
-
-		
+	
      /* =========================================================
    🔐 PIN SCHUTZ
 ========================================================= */
@@ -292,8 +280,8 @@ let drawCounter = 0;
    🔐 APP ENTSPERREN
 ========================================================= */
 function unlockApp() {
-    const input = document.getElementById("pinField").value;
-    if (input === APP_PIN) {
+    const pin = document.getElementById("pinField").value;
+    if (pin === APP_PIN) {
         document.getElementById("appLock").style.display = "none";
         init();
     } else {
@@ -463,16 +451,6 @@ async function init() {
 		    document.getElementById("pinOverlay").style.display = "none";
 		}
 
-		function exportBackup() {
-    const data = {
-        totalChildren,
-        emergencyPlaces,
-        childrenData,
-        currentSelection,
-        logEntries,
-        drawCounter
-    };
-
     const blob = new Blob(
         [JSON.stringify(data, null, 2)],
         { type: "application/json" }
@@ -484,39 +462,10 @@ async function init() {
     a.click();
 	}
 
-		function restoreBackup() {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "application/json";
-
-    input.onchange = e => {
-        const file = e.target.files[0];
-        const reader = new FileReader();
-        reader.onload = () => {
-            const data = JSON.parse(reader.result);
-            ({
-                totalChildren,
-                emergencyPlaces,
-                childrenData,
-                currentSelection,
-                logEntries,
-                drawCounter
-            } = data);
-            saveToStorage();
-            renderChildren();
-            renderLog();
-            updateButtons();
-            checkFairness();
-        };
-        reader.readAsText(file);
-    };
-    input.click();
-}
-
 		function toggleEmergency() {
     const el = document.getElementById("emergencySelect");
     el.style.display = el.style.display === "block" ? "none" : "block";
-
+}
 		
         // 🎯 PERFEKTER FAIRNESS-ALGORITHMUS
         function startRandomSelection() {
@@ -662,8 +611,6 @@ function renderChildren() {
             status.className = `status-bar ${maxD - minD <= 1 ? 'status-perfect' : 'status-warning'}`;
         }
 
-        function showPinDialog() { document.getElementById('pinOverlay').style.display = 'flex'; }
-        function hidePinDialog() { document.getElementById('pinOverlay').style.display = 'none'; }
         function confirmReset() {
             if(document.getElementById('pinInput').value === '0000') {
                 for(let i=1; i<=totalChildren; i++) childrenData[i] = {draws:0, lastDraw:null};
@@ -756,6 +703,7 @@ function renderChildren() {
 	<input type="file" id="backupFileInput" accept=".txt" style="display:none">
 </body>
 </html>
+
 
 
 

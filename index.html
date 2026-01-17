@@ -452,21 +452,6 @@ async function init() {
 		    document.getElementById("pinOverlay").style.display = "none";
 		}
 
-    const blob = new Blob(
-        [JSON.stringify(data, null, 2)],
-        { type: "application/json" }
-    );
-
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "notbetreuung_backup.json";
-    a.click();
-	}
-
-		function toggleEmergency() {
-    const el = document.getElementById("emergencySelect");
-    el.style.display = el.style.display === "block" ? "none" : "block";
-}
 		
         // 🎯 PERFEKTER FAIRNESS-ALGORITHMUS
         function startRandomSelection() {
@@ -704,3 +689,4 @@ function renderChildren() {
 	<input type="file" id="backupFileInput" accept=".txt" style="display:none">
 </body>
 </html>
+

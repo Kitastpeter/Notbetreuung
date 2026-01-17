@@ -12,6 +12,24 @@
             min-height: 100vh;
             padding: 20px;
         }
+
+<div id="appLock" style="
+    position:fixed; inset:0; background:#111;
+    display:flex; align-items:center; justify-content:center;
+    z-index:9999; color:white;">
+  <div style="background:#222;padding:30px;border-radius:12px;text-align:center;">
+    <h2>🔐 Zugriff geschützt</h2>
+    <input id="pinField" type="password" maxlength="4"
+           style="font-size:24px;text-align:center;padding:10px;">
+    <div id="pinError" style="color:#f66;display:none;margin-top:10px;">
+      ❌ Falsche PIN
+    </div>
+    <br><br>
+    <button onclick="unlockApp()">Entsperren</button>
+  </div>
+</div>
+
+		
         .container {
             max-width: 1400px;
             margin: 0 auto;
@@ -231,9 +249,21 @@
     </div>
 
     <script>
-        let totalChildren = 70, emergencyPlaces = 40, childrenData = {}, currentSelection = [], 
-            logEntries = [], drawCounter = 0;
 
+const APP_PIN = "2749";
+
+function unlockApp() {
+    const pin = document.getElementById("pinField").value;
+    if (pin === APP_PIN) {
+        document.getElementById("appLock").style.display = "none";
+        init();
+    } else {
+        document.getElementById("pinError").style.display = "block";
+        document.getElementById("pinField").value = "";
+    }
+}
+
+		
      /* =========================================================
    🔐 PIN SCHUTZ
 ========================================================= */
@@ -373,12 +403,18 @@ async function loadFromStorage() {
     }
 }
 			
-        function init() {
-            loadFromStorage() || (ensureChildrenExist(), saveToStorage());
-            updateChildSelect(); renderChildren(); renderLog(); loadSettings(); updateButtons();
-            logAction('🚀 Fairness-Algorithmus v3.0 aktiv');
-            checkFairness();
-        }
+async function init() {
+    await loadFromStorage();
+    ensureChildrenExist();
+    updateChildSelect();
+    renderChildren();
+    renderLog();
+    loadSettings();
+    updateButtons();
+    logAction('🚀 Fairness-Algorithmus v3.1 aktiv');
+    checkFairness();
+}
+
 
         function ensureChildrenExist() {
             for(let i=1; i<=totalChildren; i++) childrenData[i] = {draws:0, lastDraw:null};
@@ -659,4 +695,5 @@ function renderChildren() {
 	<input type="file" id="backupFileInput" accept=".txt" style="display:none">
 </body>
 </html>
+
 

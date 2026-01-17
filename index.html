@@ -457,6 +457,69 @@ async function init() {
             document.getElementById('selectionStats').textContent = `${currentSelection.length} von ${emergencyPlaces}`;
         }
 
+		function showPinDialog() {
+		    document.getElementById("pinOverlay").style.display = "flex";
+		}
+
+		function hidePinDialog() {
+		    document.getElementById("pinOverlay").style.display = "none";
+		}
+
+		function exportBackup() {
+    const data = {
+        totalChildren,
+        emergencyPlaces,
+        childrenData,
+        currentSelection,
+        logEntries,
+        drawCounter
+    };
+
+    const blob = new Blob(
+        [JSON.stringify(data, null, 2)],
+        { type: "application/json" }
+    );
+
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "notbetreuung_backup.json";
+    a.click();
+	}
+
+		function restoreBackup() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json";
+
+    input.onchange = e => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = () => {
+            const data = JSON.parse(reader.result);
+            ({
+                totalChildren,
+                emergencyPlaces,
+                childrenData,
+                currentSelection,
+                logEntries,
+                drawCounter
+            } = data);
+            saveToStorage();
+            renderChildren();
+            renderLog();
+            updateButtons();
+            checkFairness();
+        };
+        reader.readAsText(file);
+    };
+    input.click();
+}
+
+		function toggleEmergency() {
+    const el = document.getElementById("emergencySelect");
+    el.style.display = el.style.display === "block" ? "none" : "block";
+
+		
         // 🎯 PERFEKTER FAIRNESS-ALGORITHMUS
         function startRandomSelection() {
     drawCounter++;
@@ -695,5 +758,6 @@ function renderChildren() {
 	<input type="file" id="backupFileInput" accept=".txt" style="display:none">
 </body>
 </html>
+
 
 

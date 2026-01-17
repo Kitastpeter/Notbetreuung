@@ -248,27 +248,27 @@
         </div>
     </div>
 
-    <script>
-	console.log("SCRIPT START");
-
-     /* =========================================================
-   🔐 PIN SCHUTZ
-========================================================= */
-const APP_PIN = "2749"; // <-- PIN hier ändern
+<script>
+console.log("SCRIPT START");
 
 /* =========================================================
-   ☁️ GITHUB CLOUD KONFIGURATION (PLATZHALTER)
+   🔐 PIN
+========================================================= */
+const APP_PIN = "2749";
+
+/* =========================================================
+   ☁️ GITHUB (OPTIONAL)
 ========================================================= */
 const GITHUB_CONFIG = {
-    owner: "kitastpeter",                     // <-- GitHub Name
-    repo: "Notbetreuung",                // <-- Repo Name
+    owner: "kitastpeter",
+    repo: "Notbetreuung",
     file: "data.json",
     branch: "main",
-    token: "github_pat"      // <-- PLATZHALTER
+    token: "__TOKEN_NUR_LOKAL__" // leer lassen oder echten Token
 };
 
 /* =========================================================
-   📦 GLOBALE DATEN
+   📦 STATE
 ========================================================= */
 let totalChildren = 70;
 let emergencyPlaces = 40;
@@ -278,7 +278,7 @@ let logEntries = [];
 let drawCounter = 0;
 
 /* =========================================================
-   🔐 APP ENTSPERREN
+   🔐 LOGIN
 ========================================================= */
 function unlockApp() {
     const pin = document.getElementById("pinField").value;
@@ -292,67 +292,48 @@ function unlockApp() {
 }
 
 /* =========================================================
-   ☁️ CLOUD LADEN
+   ☁️ CLOUD
 ========================================================= */
 async function loadFromCloud() {
     try {
         const url = `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${GITHUB_CONFIG.file}`;
-        const res = await fetch(url, { cache: "no-store" });
-        if (!res.ok) throw new Error();
-
-        const data = await res.json();
-        ({
-            childrenData,
-            currentSelection,
-            logEntries,
-            drawCounter,
-            totalChildren,
-            emergencyPlaces
-        } = data);
-
+        const r = await fetch(url, { cache: "no-store" });
+        if (!r.ok) throw new Error();
+        Object.assign(window, await r.json());
         return true;
-    } catch (e) {
-        console.warn("Cloud nicht erreichbar – nutze lokal");
+    } catch {
         return false;
     }
 }
 
-/* =========================================================
-   ☁️ CLOUD SPEICHERN
-========================================================= */
 async function saveToCloud() {
-    if (GITHUB_CONFIG.token === "github_pat") return;
+    if (GITHUB_CONFIG.token === "__TOKEN_NUR_LOKAL__") return;
 
     const content = {
+        totalChildren,
+        emergencyPlaces,
         childrenData,
         currentSelection,
         logEntries,
         drawCounter,
-        totalChildren,
-        emergencyPlaces,
-        lastUpdate: new Date().toISOString()
+        updated: new Date().toISOString()
     };
 
-    const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.file}`;
-
-    const res = await fetch(apiUrl, {
-        headers: {
-            Authorization: `Bearer ${GITHUB_CONFIG.token}`,
-            Accept: "application/vnd.github+json"
-        }
+    const api = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.file}`;
+    const res = await fetch(api, {
+        headers: { Authorization: `Bearer ${GITHUB_CONFIG.token}` }
     });
-
     const json = await res.json();
 
-    await fetch(apiUrl, {
+    await fetch(api, {
         method: "PUT",
         headers: {
             Authorization: `Bearer ${GITHUB_CONFIG.token}`,
             Accept: "application/vnd.github+json"
         },
         body: JSON.stringify({
-            message: "Auto-Save Notbetreuung",
-            content: btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2)))),
+            message: "Auto Save",
+            content: btoa(JSON.stringify(content, null, 2)),
             sha: json.sha,
             branch: GITHUB_CONFIG.branch
         })
@@ -360,333 +341,171 @@ async function saveToCloud() {
 }
 
 /* =========================================================
-   💾 LOKAL + CLOUD KOMBINIERT
+   💾 STORAGE
 ========================================================= */
 async function saveToStorage() {
     localStorage.setItem("kita_backup", JSON.stringify({
-        childrenData,
-        currentSelection,
-        logEntries,
-        drawCounter,
-        totalChildren,
-        emergencyPlaces
+        totalChildren, emergencyPlaces, childrenData,
+        currentSelection, logEntries, drawCounter
     }));
     await saveToCloud();
 }
 
 async function loadFromStorage() {
     if (await loadFromCloud()) return;
-
-    const local = localStorage.getItem("kita_backup");
-    if (local) {
-        ({
-            childrenData,
-            currentSelection,
-            logEntries,
-            drawCounter,
-            totalChildren,
-            emergencyPlaces
-        } = JSON.parse(local));
-    }
+    const d = localStorage.getItem("kita_backup");
+    if (d) Object.assign(window, JSON.parse(d));
 }
-			
+
+/* =========================================================
+   🚀 INIT
+========================================================= */
 async function init() {
     await loadFromStorage();
     ensureChildrenExist();
+    loadSettings();
     updateChildSelect();
     renderChildren();
     renderLog();
-    loadSettings();
     updateButtons();
-    logAction('🚀 Fairness-Algorithmus v3.1 aktiv');
     checkFairness();
+    logAction("🚀 System gestartet");
 }
 
+/* =========================================================
+   ⚙️ SETTINGS
+========================================================= */
+function ensureChildrenExist() {
+    for (let i = 1; i <= totalChildren; i++)
+        childrenData[i] ??= { draws: 0, lastDraw: null };
+}
 
-        function ensureChildrenExist() {
-            for(let i=1; i<=totalChildren; i++) childrenData[i] = {draws:0, lastDraw:null};
-        }
+function saveSettings() {
+    totalChildren = +document.getElementById("totalChildren").value || 70;
+    emergencyPlaces = +document.getElementById("emergencyPlaces").value || 40;
+    ensureChildrenExist();
+    updateChildSelect();
+    saveToStorage();
+}
 
-        function saveSettings() {
-            totalChildren = +document.getElementById('totalChildren').value || 70;
-            emergencyPlaces = +document.getElementById('emergencyPlaces').value || 40;
-            ensureChildrenExist(); updateChildSelect(); saveToStorage(); renderChildren();
-            logAction(`⚙️ ${totalChildren} Kinder, ${emergencyPlaces} Plätze`);
-        }
+function loadSettings() {
+    document.getElementById("totalChildren").value = totalChildren;
+    document.getElementById("emergencyPlaces").value = emergencyPlaces;
+}
 
-        function loadSettings() {
-            document.getElementById('totalChildren').value = totalChildren;
-            document.getElementById('emergencyPlaces').value = emergencyPlaces;
-        }
-
-        function updateChildSelect() {
-            const s = document.getElementById('emergencyChildSelect');
-            s.innerHTML = '<option value="">Pool...</option>';
-            for(let i=1; i<=totalChildren; i++) if(!currentSelection.includes(i)) {
-                s.innerHTML += `<option value="${i}">Kind ${i} (${childrenData[i].draws}x)</option>`;
-            }
-        }
-
-        function logAction(msg) {
-            logEntries.unshift({time: new Date().toLocaleString('de-DE'), message: msg});
-            logEntries.length = Math.min(500, logEntries.length);
-            renderLog(); saveToStorage();
-        }
-
-        function renderLog() {
-            document.getElementById('logEntries').innerHTML = logEntries.slice(0,50)
-                .map(e => `<div class="log-entry"><div class="log-time">${e.time}</div><div class="log-message">${e.message}</div></div>`).join('');
-        }
-
-        function updateButtons() {
-            document.getElementById('clearBtn').disabled = !currentSelection.length;
-            document.getElementById('copyBtn').disabled = !currentSelection.length;
-            document.getElementById('selectionStats').textContent = `${currentSelection.length} von ${emergencyPlaces}`;
-        }
-
-		function showPinDialog() {
-		    document.getElementById("pinOverlay").style.display = "flex";
-		}
-
-		function hidePinDialog() {
-		    document.getElementById("pinOverlay").style.display = "none";
-		}
-
-		
-        // 🎯 PERFEKTER FAIRNESS-ALGORITHMUS
-        function startRandomSelection() {
+/* =========================================================
+   🎲 ZIEHUNG
+========================================================= */
+function startRandomSelection() {
     drawCounter++;
     currentSelection = [];
 
-    // Pool aller Kinder mit Ziehungsanzahl
-    const pool = [];
-    for (let i = 1; i <= totalChildren; i++) {
-        pool.push({ id: i, draws: childrenData[i].draws });
-    }
+    const pool = Object.keys(childrenData)
+        .map(id => ({ id: +id, draws: childrenData[id].draws }))
+        .sort((a, b) => a.draws - b.draws || Math.random() - 0.5);
 
-    // Sortierung: erst wenigste Ziehungen, dann Zufall
-    pool.sort((a, b) => {
-        if (a.draws !== b.draws) return a.draws - b.draws;
-        return Math.random() - 0.5;
+    pool.slice(0, emergencyPlaces).forEach(k => {
+        currentSelection.push(k.id);
+        childrenData[k.id].draws++;
+        childrenData[k.id].lastDraw = new Date().toISOString();
     });
 
-    // 🔒 ZWINGEND exakt emergencyPlaces Kinder
-    const selected = pool.slice(0, emergencyPlaces);
-
-    selected.forEach(kid => {
-        currentSelection.push(kid.id);
-        childrenData[kid.id].draws++;
-        childrenData[kid.id].lastDraw = new Date().toISOString();
-    });
-
-    const minDraws = selected[0]?.draws ?? 0;
-    const maxDraws = Math.max(...selected.map(k => childrenData[k.id].draws));
-    const newKids = selected.filter(k => childrenData[k.id].draws === 1).length;
-
-    logAction(`🎲 #${drawCounter}: ${currentSelection.length}/${emergencyPlaces} (${newKids} neu) - Fairness ${minDraws}x`);
-    document.getElementById('drawStats').innerHTML =
-        `📊 Ziehung #${drawCounter}<br>Aktueller Unterschied Min: ${minDraws}x zu Max: ${maxDraws}x`;
-
-    updateChildSelect();
+    logAction(`🎲 Ziehung #${drawCounter} (${currentSelection.length})`);
     renderChildren();
-    saveToStorage();
     updateButtons();
+    saveToStorage();
     checkFairness();
 }
 
-            
-
-        
-
-        document.getElementById('startBtn').onclick = startRandomSelection;
-
-        function clearCurrentSelection() {
-            logAction(`🗑️ Ziehung #${drawCounter} geleert`);
-            currentSelection = []; document.getElementById('drawStats').innerHTML = ''; 
-            renderChildren(); saveToStorage(); updateButtons();
-        }
+/* =========================================================
+   📋 UI
+========================================================= */
+function updateChildSelect() {
+    const s = document.getElementById("emergencyChildSelect");
+    s.innerHTML = `<option value="">Pool...</option>`;
+    for (let i = 1; i <= totalChildren; i++)
+        if (!currentSelection.includes(i))
+            s.innerHTML += `<option value="${i}">Kind ${i}</option>`;
+}
 
 function renderChildren() {
-    const c = document.getElementById('childrenList');
-
-    // 🔽 Scrollbar direkt per JS
-    c.style.maxHeight = '700px';
-    c.style.overflowY = 'auto';
-    c.style.paddingRight = '10px';
+    const c = document.getElementById("childrenList");
+    c.style.maxHeight = "700px";
+    c.style.overflowY = "auto";
 
     if (!currentSelection.length) {
-        c.innerHTML =
-            '<div style="text-align:center;color:#999;padding:60px;font-size:18px;">👆 "Zufallsauswahl starten" für faire Ziehung!</div>';
+        c.innerHTML = "👆 Ziehung starten";
         return;
     }
 
-    c.innerHTML = currentSelection.map(id => {
-        const d = childrenData[id];
-        const isNew = d.draws === 1;
-        return `
-        <div class="child-item ${isNew ? 'new' : 'repeat'}">
-            <div class="child-info">
-                <h4>👶 Kind ${id}</h4>
-                <div><strong>${isNew ? '🥳 NEU' : '🔄 ' + d.draws + 'x'}</strong></div>
-            </div>
-            <div class="child-stats">
-                <button class="back-btn" onclick="returnChild(${id})">❌ Nicht benötigt</button>
-            </div>
-        </div>`;
-    }).join('');
+    c.innerHTML = currentSelection.map(id =>
+        `<div>👶 Kind ${id} (${childrenData[id].draws}x)</div>`
+    ).join("");
 }
 
+function updateButtons() {
+    document.getElementById("selectionStats").textContent =
+        `${currentSelection.length}/${emergencyPlaces}`;
+}
 
-        window.returnChild = function(childId) {
-            const idx = currentSelection.indexOf(childId);
-            if(idx === -1) return;
-            childrenData[childId].draws = Math.max(0, childrenData[childId].draws - 1);
-            currentSelection.splice(idx, 1);
-            
-            // Faire Nachfüllung
-            const candidates = [];
-            for(let i=1; i<=totalChildren; i++) if(!currentSelection.includes(i)) {
-                candidates.push({id:i, draws:childrenData[i].draws});
-            }
-            if(candidates.length) {
-                candidates.sort((a,b) => a.draws - b.draws);
-                const rep = candidates[0].id;
-                currentSelection.push(rep); childrenData[rep].draws++;
-                logAction(`🔄 ${childId} → ${rep}`);
-            } else logAction(`⚠️ ${childId} entfernt`);
-            
-            updateChildSelect(); renderChildren(); saveToStorage();
-        }
+/* =========================================================
+   📜 LOG
+========================================================= */
+function logAction(msg) {
+    logEntries.unshift({ time: new Date().toLocaleString(), msg });
+    logEntries = logEntries.slice(0, 300);
+    renderLog();
+}
 
-        function copyToClipboard() {
-            const text = currentSelection.map(id => `Kind ${id}`).join('\n');
-            navigator.clipboard?.writeText(text)?.then(feedbackCopy) || (() => {
-                const ta = document.createElement('textarea');
-                ta.value = text; document.body.appendChild(ta); ta.select(); 
-                document.execCommand('copy'); document.body.removeChild(ta); feedbackCopy();
-            })();
-        }
+function renderLog() {
+    document.getElementById("logEntries").innerHTML =
+        logEntries.map(l => `<div>${l.time} – ${l.msg}</div>`).join("");
+}
 
-        function feedbackCopy() {
-            logAction(`📋 ${currentSelection.length} Kinder (#${drawCounter})`);
-            const btn = document.getElementById('copyBtn'), old = btn.textContent;
-            btn.textContent = `✅ Kopiert! (${currentSelection.length})`;
-            setTimeout(()=>btn.textContent=old, 2000);
-        }
+/* =========================================================
+   🚨 EXTRA
+========================================================= */
+function toggleEmergency() {
+    const e = document.getElementById("emergencySelect");
+    e.style.display = e.style.display === "block" ? "none" : "block";
+}
 
-        function toggleEmergency() {
-            const d = document.getElementById('emergencySelect');
-            d.style.display = d.style.display === 'block' ? 'none' : 'block';
-        }
-
-        function addEmergencyChild() {
-            const id = +document.getElementById('emergencyChildSelect').value;
-            if(id && !currentSelection.includes(id)) {
-                currentSelection.push(id); childrenData[id].draws++;
-                logAction(`🚨 Notfall: ${id}`);
-                updateChildSelect(); renderChildren(); saveToStorage();
-                document.getElementById('emergencySelect').style.display = 'none';
-            }
-        }
-
-        function checkFairness() {
-            const draws = Object.values(childrenData).map(c => c.draws);
-            const minD = Math.min(...draws), maxD = Math.max(...draws);
-            const status = document.getElementById('statusBar');
-            status.textContent = `✅ Fairness perfekt: ${minD}-${maxD}x (${maxD-minD <= 1 ? 'PERFEKT' : 'Warnung'})`;
-            status.className = `status-bar ${maxD - minD <= 1 ? 'status-perfect' : 'status-warning'}`;
-        }
-
-        function confirmReset() {
-            if(document.getElementById('pinInput').value === '0000') {
-                for(let i=1; i<=totalChildren; i++) childrenData[i] = {draws:0, lastDraw:null};
-                currentSelection = []; drawCounter = 0;
-                logAction('🎯 NEUES JAHR - Perfect Reset');
-                renderChildren(); saveToStorage(); hidePinDialog(); checkFairness();
-            } else {
-                alert('❌ PIN 0000'); document.getElementById('pinInput').value = '';
-            }
-        }
-
-        document.getElementById('pinInput').addEventListener('keypress', e => e.key==='Enter' && confirmReset());
-        document.getElementById('totalChildren').addEventListener('change', saveSettings);
-        document.getElementById('emergencyPlaces').addEventListener('change', saveSettings);
-
-        window.addEventListener("load", () => {
-    document.getElementById("pinField").focus();
-});
-
-		
-		function exportBackup() {
-    const backup = {
-        meta: {
-            app: "Notbetreuung Kita St. Peter Körrenzig",
-            created: new Date().toISOString(),
-            version: "3.1"
-        },
-        state: {
-            totalChildren,
-            emergencyPlaces,
-            drawCounter,
-            childrenData,
-            logEntries
-        }
-    };
-
+function exportBackup() {
     const blob = new Blob(
-        [JSON.stringify(backup, null, 2)],
-        { type: "text/plain;charset=utf-8" }
+        [JSON.stringify({ totalChildren, emergencyPlaces, childrenData, logEntries, drawCounter }, null, 2)],
+        { type: "application/json" }
     );
-
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `notbetreuung_sicherung_${new Date().toISOString().slice(0,10)}.txt`;
+    a.download = "notbetreuung_backup.json";
     a.click();
-
-    logAction("💾 Sicherung exportiert");
 }
 
-		function restoreBackup() {
-    const input = document.getElementById("backupFileInput");
-    input.click();
-
-    input.onchange = () => {
-        const file = input.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = e => {
-            try {
-                const data = JSON.parse(e.target.result);
-
-                if (!data.state || !data.meta) {
-                    alert("❌ Ungültige Sicherungsdatei");
-                    return;
-                }
-
-                ({ totalChildren, emergencyPlaces, drawCounter, childrenData, logEntries } = data.state);
-
-                currentSelection = [];
-                saveToStorage();
-                loadSettings();
-                updateChildSelect();
-                renderChildren();
-                renderLog();
-                checkFairness();
-
-                logAction("🔄 Sicherung wiederhergestellt");
-                alert("✅ Sicherung erfolgreich geladen");
-            } catch {
-                alert("❌ Datei konnte nicht gelesen werden");
-            }
-        };
-        reader.readAsText(file);
+function restoreBackup() {
+    const i = document.createElement("input");
+    i.type = "file";
+    i.onchange = e => {
+        Object.assign(window, JSON.parse(e.target.files[0].text()));
+        saveToStorage();
+        init();
     };
+    i.click();
 }
 
-		console.log("SCRIPT ENDE");
-    </script>
+function checkFairness() {
+    const d = Object.values(childrenData).map(c => c.draws);
+    const min = Math.min(...d), max = Math.max(...d);
+    document.getElementById("statusBar").textContent =
+        `Fairness: ${min}–${max}`;
+}
+
+window.onload = () => document.getElementById("pinField").focus();
+
+console.log("SCRIPT ENDE");
+</script>
+
 	<input type="file" id="backupFileInput" accept=".txt" style="display:none">
 </body>
 </html>
+
 
